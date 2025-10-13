@@ -3,6 +3,7 @@ document.getElementById('summarizeBtn').addEventListener('click', async () => {
   const summaryText = document.getElementById('summaryText');
 
   loading.style.display = 'block';
+  loading.innerText="Generating Visualization...."
   summaryText.textContent = '';
   clearCharts();
 
@@ -16,7 +17,7 @@ document.getElementById('summarizeBtn').addEventListener('click', async () => {
   try {
     // ✅ Check if the AI Prompt API is available
     if (!LanguageModel.availability()) {
-      loading.textContent = "⚠️ Chrome Prompt API not available in this browser.";
+      loading.textContent = " Chrome Prompt API not available in this browser.";
       return;
     }
 
@@ -24,7 +25,7 @@ document.getElementById('summarizeBtn').addEventListener('click', async () => {
     console.log("AI model status:", availability);
 
     if (availability !== "available") {
-      loading.textContent = "⚙️ Model is not yet ready. Please wait for Gemini Nano to finish downloading.";
+      loading.textContent = " Model is not yet ready. Please wait for Gemini Nano to finish downloading.";
       return;
     }
 
@@ -57,6 +58,7 @@ document.getElementById('summarizeBtn').addEventListener('click', async () => {
   } catch (err) {
     loading.textContent = "❌ Error: " + err.message;
   }
+  
 });
 
 function parseJSON(text) {
@@ -99,29 +101,132 @@ function drawCharts(labels, values) {
       options: {
       responsive: true,
       plugins: {
-        legend: { display: type !== "bar" },
+        legend: {
+        display: type !== "bar",
+        labels: {
+          color: "#fff" // Set legend text to white
+        }
+        },
         tooltip: {
         callbacks: {
           label: function(context) {
           return `${context.label}: ${context.parsed.y ?? context.parsed}`;
           }
-        }
+        },
+        backgroundColor: "#222",
+        titleColor: "#fff",
+        bodyColor: "#fff",
+        borderColor: "#fff"
         }
       },
       scales: type === "bar" || type === "line" ? {
+        x: {
+        ticks: { color: "#fff" }, // X axis labels white
+        title: { color: "#fff" },
+        grid: { color: "#fff" }, // X axis grid lines white
+        border: { color: "#fff" } // X axis border white
+        },
         y: {
         beginAtZero: true,
         max: 10,
-        title: { display: true, text: "Importance" }
+        title: { display: true, text: "Importance", color: "#fff" },
+        ticks: { color: "#fff" }, // Y axis labels white
+        grid: { color: "#fff" }, // Y axis grid lines white
+        border: { color: "#fff" } // Y axis border white
         }
       } : {}
       }
+     
     });
+
+    // Add a single download button for all charts (only once)
+    if (!document.getElementById("all-charts-download-btn")) {
+      const downloadBtn = document.createElement("button");
+      downloadBtn.id = "all-charts-download-btn";
+      downloadBtn.textContent = "Download All Charts";
+      // Insert after the last chart
+      const lastChartElem = document.getElementById(chartConfigs[chartConfigs.length - 1].id);
+      lastChartElem.parentNode.insertBefore(downloadBtn, lastChartElem.nextSibling);
+
+      downloadBtn.onclick = () => {
+      charts.forEach((chart, idx) => {
+        const link = document.createElement("a");
+        link.href = chart.toBase64Image();
+        link.download = `${chartConfigs[idx].id}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+      });
+      };
+    }
+
+
     charts.push(chart);
   });
 }
 
+
 function clearCharts() {
   charts.forEach(c => c.destroy());
   charts = [];
+  const downloadBtn = document.getElementById("all-charts-download-btn");
+  if (downloadBtn) {
+    downloadBtn.remove();
+  }
 }
+
+document.getElementById('summarizeOnlyBtn').addEventListener('click', async () => {
+  const loading = document.getElementById('loading');
+  loading.innerText="Generating Summary.....";
+  const summaryText = document.getElementById('summaryText');
+
+  loading.style.display = 'block';
+  summaryText.textContent = '';
+  clearCharts();
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const [{ result: pageText }] = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: () => document.body.innerText.slice(0, 5000)
+  });
+
+  try {
+    if (!LanguageModel.availability()) {
+      loading.textContent = " Chrome Prompt API not available in this browser.";
+      return;
+    }
+
+    const availability = await LanguageModel.availability();
+    if (availability !== "available") {
+      loading.textContent = " Model is not yet ready. Please wait for Gemini Nano to finish downloading.";
+      return;
+    }
+
+    const session = await LanguageModel.create({
+      systemPrompt: "You are a helpful assistant that summarizes webpage text."
+    });
+
+    const prompt = `
+      Summarize this text in 20-25 lines, capturing more details and context:
+      ${pageText}
+      Output format (JSON):
+      {
+        "summary": "..."
+      }
+    `;
+
+    const response = await session.prompt(prompt);
+    const parsed = parseJSON(response);
+
+    if (!parsed) throw new Error("Failed to parse AI response.");
+
+    loading.style.display = 'none';
+    summaryText.textContent = parsed.summary;
+  } catch (err) {
+    loading.textContent = "❌ Error: " + err.message;
+  }
+});
+
+
+
