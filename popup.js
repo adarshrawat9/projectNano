@@ -145,9 +145,14 @@ class AIVisualizerPro {
       
       this.addMessageToChat('ai', responseText);
       
-      // Generate visualizations if we have structured data
-      if (result.keywords && result.scores) {
+      // Only show charts if AI determines they're necessary
+      if (result.showCharts && result.keywords && result.scores) {
+        // Add chart reason to chat
+        this.addMessageToChat('ai', `📊 Charts: ${result.chartReason}`);
         await this.generateVisualizations(result.keywords, result.scores);
+      } else if (result.chartReason) {
+        // Explain why charts aren't shown
+        this.addMessageToChat('ai', `📊 Charts: ${result.chartReason}`);
       }
       
     } catch (error) {
@@ -203,26 +208,28 @@ class AIVisualizerPro {
     try {
       // Create AI session with enhanced system prompt
     const session = await LanguageModel.create({
-        systemPrompt: `You are an AI assistant for Chrome Built-in AI Challenge 2025. Provide clear, helpful responses.`
+        systemPrompt: `You are a professional AI assistant for Chrome Built-in AI Challenge 2025. Provide clear, concise responses. Only suggest charts when data analysis would benefit from visualization.`
       });
 
       let prompt = '';
       
       if (typeof inputData === 'object' && inputData.text) {
         // Screen capture mode - analyze webpage data
-        prompt = `Analyze this webpage and extract key information:
+        prompt = `Analyze this webpage and provide a professional summary:
 
         Title: ${inputData.title}
         URL: ${inputData.url}
-        Content: ${inputData.text.substring(0, 3000)}
+        Content: ${inputData.text.substring(0, 2000)}
         Headings: ${inputData.headings.map(h => h.text).join(', ')}
         
-        Provide a clear summary and identify the main topics from this specific webpage content.
+        Provide a concise summary and determine if charts would be helpful for this content.
         
         Output format (JSON):
         {
-          "summary": "Clear summary of this webpage...",
-          "keywords": ["actual", "topics", "from", "page"],
+          "summary": "Professional 2-3 sentence summary of this webpage...",
+          "showCharts": true/false,
+          "chartReason": "Why charts are/aren't needed",
+          "keywords": ["topic1", "topic2", "topic3", "topic4"],
           "scores": [8, 7, 6, 5],
           "pageDetails": {
             "title": "${inputData.title}",
@@ -233,13 +240,15 @@ class AIVisualizerPro {
         }`;
       } else {
         // Manual input mode - process user prompt
-        prompt = `Answer this question: "${inputData}"
+        prompt = `Answer this question professionally: "${inputData}"
         
-        Provide a helpful response based on the user's question.
+        Provide a helpful response and determine if charts would be useful.
         
       Output format (JSON):
       {
-          "summary": "Your response here...",
+          "summary": "Professional response here...",
+          "showCharts": true/false,
+          "chartReason": "Why charts are/aren't needed",
           "keywords": ["relevant", "topics"],
           "scores": [7, 6],
           "pageDetails": {
@@ -273,19 +282,40 @@ class AIVisualizerPro {
       if (jsonStart === -1 || jsonEnd === -1) {
         return {
           summary: text,
+          showCharts: false,
+          chartReason: "Unable to parse response",
           keywords: ['General', 'Content', 'Analysis', 'Summary'],
           scores: [7, 6, 5, 4],
-          insights: ['Content processed successfully']
+          pageDetails: {
+            title: "Unknown",
+            url: "N/A",
+            mainTopics: ['Content processed'],
+            keyInsights: ['Analysis completed']
+          }
         };
       }
-      return JSON.parse(text.slice(jsonStart, jsonEnd + 1));
+      const parsed = JSON.parse(text.slice(jsonStart, jsonEnd + 1));
+      
+      // Ensure showCharts is boolean
+      if (typeof parsed.showCharts !== 'boolean') {
+        parsed.showCharts = false;
+      }
+      
+      return parsed;
     } catch (error) {
       console.error('JSON parsing error:', error);
       return {
         summary: text,
+        showCharts: false,
+        chartReason: "Unable to parse response",
         keywords: ['General', 'Content', 'Analysis', 'Summary'],
         scores: [7, 6, 5, 4],
-        insights: ['Content processed successfully']
+        pageDetails: {
+          title: "Unknown",
+          url: "N/A",
+          mainTopics: ['Content processed'],
+          keyInsights: ['Analysis completed']
+        }
       };
     }
   }
@@ -444,11 +474,11 @@ class AIVisualizerPro {
     this.chatContainer.innerHTML = `
       <div class="welcome-message">
         <div class="welcome-content">
-          <h3>Welcome to AI Visualizer Pro!</h3>
-          <p>Choose your mode:</p>
+          <h3>AI Visualizer Pro</h3>
+          <p>Professional AI-powered webpage analysis</p>
           <ul>
             <li><strong>Screen Capture:</strong> Analyze current webpage content</li>
-            <li><strong>Manual Input:</strong> Type your own prompts</li>
+            <li><strong>Manual Input:</strong> Ask questions or request analysis</li>
           </ul>
         </div>
       </div>
