@@ -58,9 +58,9 @@ class AIVisualizerPro {
       if (!LanguageModel || !LanguageModel.availability) {
         this.showError('Chrome AI APIs not available. Please ensure you\'re using Chrome with AI features enabled.');
         return false;
-      }
-      
-      const availability = await LanguageModel.availability();
+    }
+
+    const availability = await LanguageModel.availability();
       console.log('AI Model availability:', availability);
       
       if (availability !== 'available') {
@@ -117,7 +117,7 @@ class AIVisualizerPro {
         if (!userMessage) {
           this.hideLoading();
           this.isProcessing = false;
-          return;
+      return;
         }
         inputData = userMessage;
         this.manualInput.value = '';
@@ -129,11 +129,21 @@ class AIVisualizerPro {
       // Process with AI
       const result = await this.processWithAI(inputData);
       
-      // Add AI response to chat
-      this.addMessageToChat('ai', result.summary);
+      // Add AI response to chat with page details
+      let responseText = result.summary;
+      if (result.pageDetails) {
+        responseText += `\n\n📄 Page Details:\n`;
+        responseText += `Title: ${result.pageDetails.title}\n`;
+        responseText += `URL: ${result.pageDetails.url}\n`;
+        if (result.pageDetails.mainTopics && result.pageDetails.mainTopics.length > 0) {
+          responseText += `Main Topics: ${result.pageDetails.mainTopics.join(', ')}\n`;
+        }
+        if (result.pageDetails.keyInsights && result.pageDetails.keyInsights.length > 0) {
+          responseText += `Key Insights: ${result.pageDetails.keyInsights.join(', ')}`;
+        }
+      }
       
-      // Show flowchart
-      this.showFlowchart();
+      this.addMessageToChat('ai', responseText);
       
       // Generate visualizations if we have structured data
       if (result.keywords && result.scores) {
@@ -192,58 +202,56 @@ class AIVisualizerPro {
   async processWithAI(inputData) {
     try {
       // Create AI session with enhanced system prompt
-      const session = await LanguageModel.create({
-        systemPrompt: `You are an advanced AI assistant specialized in analyzing and summarizing content for the Chrome Built-in AI Challenge 2025. 
-        
-        Your capabilities include:
-        - Analyzing webpage content and extracting key insights
-        - Processing user prompts and providing comprehensive responses
-        - Identifying important topics and their relevance scores
-        - Generating structured data for visualization
-        
-        Always provide helpful, accurate, and detailed responses. When analyzing webpage data, extract the most important information and present it in a clear, organized manner.`
+    const session = await LanguageModel.create({
+        systemPrompt: `You are an AI assistant for Chrome Built-in AI Challenge 2025. Provide clear, helpful responses.`
       });
 
       let prompt = '';
       
       if (typeof inputData === 'object' && inputData.text) {
         // Screen capture mode - analyze webpage data
-        prompt = `Analyze this webpage data and provide a comprehensive summary with key insights:
+        prompt = `Analyze this webpage and extract key information:
 
         Title: ${inputData.title}
         URL: ${inputData.url}
-        Main Content: ${inputData.text}
-        Headings: ${JSON.stringify(inputData.headings)}
-        Meta Description: ${inputData.meta.description}
+        Content: ${inputData.text.substring(0, 3000)}
+        Headings: ${inputData.headings.map(h => h.text).join(', ')}
         
-        Please provide:
-        1. A detailed summary (3-4 paragraphs)
-        2. Key topics with importance scores (0-10 scale)
-        3. Main insights and takeaways
+        Provide a clear summary and identify the main topics from this specific webpage content.
         
         Output format (JSON):
         {
-          "summary": "Detailed summary here...",
-          "keywords": ["topic1", "topic2", "topic3", "topic4"],
+          "summary": "Clear summary of this webpage...",
+          "keywords": ["actual", "topics", "from", "page"],
           "scores": [8, 7, 6, 5],
-          "insights": ["insight1", "insight2", "insight3"]
+          "pageDetails": {
+            "title": "${inputData.title}",
+            "url": "${inputData.url}",
+            "mainTopics": ["topic1", "topic2"],
+            "keyInsights": ["insight1", "insight2"]
+          }
         }`;
       } else {
         // Manual input mode - process user prompt
-        prompt = `Please provide a comprehensive response to this user prompt: "${inputData}"
+        prompt = `Answer this question: "${inputData}"
         
-        Make your response helpful, detailed, and informative. If the user is asking for analysis or summarization, provide structured insights.
+        Provide a helpful response based on the user's question.
         
-        Output format (JSON):
-        {
-          "summary": "Your detailed response here...",
-          "keywords": ["relevant", "topics", "if", "applicable"],
-          "scores": [8, 7, 6, 5],
-          "insights": ["key", "insights", "if", "applicable"]
+      Output format (JSON):
+      {
+          "summary": "Your response here...",
+          "keywords": ["relevant", "topics"],
+          "scores": [7, 6],
+          "pageDetails": {
+            "title": "Manual Input",
+            "url": "N/A",
+            "mainTopics": ["user", "question"],
+            "keyInsights": ["response", "insights"]
+          }
         }`;
       }
 
-      const response = await session.prompt(prompt);
+    const response = await session.prompt(prompt);
       console.log('AI Response:', response);
       
       const parsed = this.parseJSON(response);
@@ -311,10 +319,6 @@ class AIVisualizerPro {
     this.saveChatHistory();
   }
 
-  showFlowchart() {
-    this.flowchartContainer.style.display = 'block';
-    this.flowchartContainer.scrollIntoView({ behavior: 'smooth' });
-  }
 
   async generateVisualizations(keywords, scores) {
     try {
@@ -332,70 +336,70 @@ class AIVisualizerPro {
   }
 
   drawCharts(labels, values) {
-    const chartConfigs = [
-      { id: "barChart", type: "bar" },
-      { id: "pieChart", type: "pie" },
-      { id: "lineChart", type: "line" }
-    ];
+  const chartConfigs = [
+    { id: "barChart", type: "bar" },
+    { id: "pieChart", type: "pie" },
+    { id: "lineChart", type: "line" }
+  ];
 
-    chartConfigs.forEach(({ id, type }) => {
-      const ctx = document.getElementById(id).getContext("2d");
-      const chart = new Chart(ctx, {
-        type,
-        data: {
-          labels,
-          datasets: [{
+  chartConfigs.forEach(({ id, type }) => {
+    const ctx = document.getElementById(id).getContext("2d");
+    const chart = new Chart(ctx, {
+      type,
+      data: {
+      labels,
+      datasets: [{
             label: "Importance Score",
-            data: values,
-            borderWidth: 2,
-            backgroundColor: labels.map((_, i) =>
-              `hsla(${i * 90}, 70%, 60%, 0.8)`
-            ),
-            borderColor: labels.map((_, i) =>
-              `hsla(${i * 90}, 70%, 40%, 1)`
-            ),
-            fill: type === "line"
-          }]
-        },
-        options: {
-          responsive: true,
+        data: values,
+        borderWidth: 2,
+            backgroundColor: [
+              '#007bff', '#28a745', '#ffc107', '#dc3545'
+            ],
+            borderColor: [
+              '#0056b3', '#1e7e34', '#e0a800', '#c82333'
+            ],
+        fill: type === "line"
+      }]
+      },
+      options: {
+      responsive: true,
           maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              display: type !== "bar",
-              labels: {
-                color: "#ffffff"
-              }
-            },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  return `${context.label}: ${context.parsed.y ?? context.parsed}`;
-                }
-              },
+      plugins: {
+        legend: {
+        display: type !== "bar",
+        labels: {
+                color: "#333333"
+        }
+        },
+        tooltip: {
+        callbacks: {
+          label: function(context) {
+          return `${context.label}: ${context.parsed.y ?? context.parsed}`;
+          }
+        },
               backgroundColor: "rgba(0, 0, 0, 0.8)",
               titleColor: "#ffffff",
               bodyColor: "#ffffff",
               borderColor: "#ffffff"
-            }
-          },
-          scales: type === "bar" || type === "line" ? {
-            x: {
-              ticks: { color: "#ffffff" },
-              title: { color: "#ffffff" },
-              grid: { color: "rgba(255, 255, 255, 0.1)" },
-              border: { color: "rgba(255, 255, 255, 0.2)" }
-            },
-            y: {
-              beginAtZero: true,
-              max: 10,
-              title: { display: true, text: "Importance Score", color: "#ffffff" },
-              ticks: { color: "#ffffff" },
-              grid: { color: "rgba(255, 255, 255, 0.1)" },
-              border: { color: "rgba(255, 255, 255, 0.2)" }
-            }
-          } : {}
         }
+      },
+      scales: type === "bar" || type === "line" ? {
+        x: {
+              ticks: { color: "#333333" },
+              title: { color: "#333333" },
+              grid: { color: "rgba(0, 0, 0, 0.1)" },
+              border: { color: "rgba(0, 0, 0, 0.2)" }
+        },
+        y: {
+        beginAtZero: true,
+        max: 10,
+              title: { display: true, text: "Importance Score", color: "#333333" },
+              ticks: { color: "#333333" },
+              grid: { color: "rgba(0, 0, 0, 0.1)" },
+              border: { color: "rgba(0, 0, 0, 0.2)" }
+        }
+      } : {}
+      }
       });
 
       this.charts.push(chart);
@@ -409,12 +413,12 @@ class AIVisualizerPro {
 
   downloadAllCharts() {
     this.charts.forEach((chart, idx) => {
-      const link = document.createElement("a");
-      link.href = chart.toBase64Image();
+        const link = document.createElement("a");
+        link.href = chart.toBase64Image();
       link.download = `ai-visualizer-chart-${idx + 1}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     });
   }
 
@@ -450,7 +454,6 @@ class AIVisualizerPro {
       </div>
     `;
     this.clearCharts();
-    this.flowchartContainer.style.display = 'none';
     this.chartsContainer.style.display = 'none';
     this.saveChatHistory();
   }
