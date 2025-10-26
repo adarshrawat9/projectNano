@@ -1,12 +1,22 @@
 {
   "manifest_version": 3,
-  "name": "AI Visualizer",
-  "version": "1.0",
-  "description": "Summarizes and visualizes webpage data using Chrome's built-in AI.",
-  "permissions": ["activeTab", "scripting"],
+  "name": "AI Visualizer Pro",
+  "version": "2.0",
+  "description": "Advanced AI-powered Chrome extension that captures screen data, processes it through Prompt API, and summarizes using Summarizer API for Chrome Built-in AI Challenge 2025.",
+  "permissions": [
+    "activeTab", 
+    "scripting", 
+    "storage",
+    "tabs",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "action": {
     "default_popup": "popup.html",
-    "default_icon": "icon.png"
+    "default_icon": "icon.png",
+    "default_title": "AI Visualizer Pro"
   },
   "background": {
     "service_worker": "background.js"
@@ -15,6 +25,12 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["icon.png"],
+      "matches": ["<all_urls>"]
     }
   ]
 }
