@@ -3,51 +3,6 @@
 
 console.log("AI Visualizer Pro content script loaded.");
 
-// Add visual indicators for AI analysis
-function addAnalysisIndicator() {
-  const indicator = document.createElement('div');
-  indicator.id = 'ai-visualizer-indicator';
-  indicator.innerHTML = `
-    <div style="
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 12px 16px;
-      border-radius: 8px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      font-size: 14px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-      z-index: 10000;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      opacity: 0.9;
-    ">
-      🤖 AI Visualizer Pro Ready
-    </div>
-  `;
-  
-  document.body.appendChild(indicator);
-  
-  // Add click handler to open extension
-  indicator.addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'openPopup' });
-  });
-  
-  // Auto-hide after 5 seconds
-  setTimeout(() => {
-    if (indicator && indicator.parentNode) {
-      indicator.style.opacity = '0';
-      setTimeout(() => {
-        if (indicator && indicator.parentNode) {
-          indicator.parentNode.removeChild(indicator);
-        }
-      }, 300);
-    }
-  }, 5000);
-}
-
 // Enhanced page data extraction
 function extractEnhancedPageData() {
   const data = {
@@ -153,7 +108,7 @@ function highlightElements(selectors) {
     try {
       const elements = document.querySelectorAll(selector);
       elements.forEach(el => {
-        el.style.outline = '2px solid #667eea';
+        el.style.outline = '2px solid #007bff';
         el.style.outlineOffset = '2px';
         el.classList.add('ai-visualizer-highlighted');
       });
@@ -171,15 +126,6 @@ function removeHighlights() {
     el.style.outlineOffset = '';
     el.classList.remove('ai-visualizer-highlighted');
   });
-}
-
-// Initialize when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    addAnalysisIndicator();
-  });
-} else {
-  addAnalysisIndicator();
 }
 
 // Export functions for use in popup

@@ -3,21 +3,6 @@
 
 chrome.runtime.onInstalled.addListener((details) => {
   console.log("AI Visualizer Pro Extension installed/updated:", details.reason);
-  
-  // Set up context menu for quick access
-  chrome.contextMenus.create({
-    id: "analyzePage",
-    title: "Analyze with AI Visualizer Pro",
-    contexts: ["page", "selection"]
-  });
-});
-
-// Handle context menu clicks
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === "analyzePage") {
-    // Open popup or send message to content script
-    chrome.action.openPopup();
-  }
 });
 
 // Handle messages from content script and popup
