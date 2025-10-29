@@ -1,5 +1,5 @@
-// AI Visualizer Pro - Enhanced Chrome Extension for AI Challenge 2025
-class AIVisualizerPro {
+// Content Analyzer Extension
+class ContentAnalyzer {
   constructor() {
     this.currentMode = 'screen';
     this.chatHistory = [];
@@ -58,22 +58,64 @@ class AIVisualizerPro {
       if (!LanguageModel || !LanguageModel.availability) {
         this.showError('Chrome AI APIs not available. Please ensure you\'re using Chrome with AI features enabled.');
         return false;
-    }
+      }
 
-    const availability = await LanguageModel.availability();
+      const availability = await LanguageModel.availability();
       console.log('AI Model availability:', availability);
       
-      if (availability !== 'available') {
-        this.showError('Gemini Nano is not ready. Please wait for the model to finish downloading.');
+      if (availability === 'available') {
+        // Check if this is the first time it's available (model just finished downloading)
+        const lastStatus = sessionStorage.getItem('lastAIStatus');
+        if (lastStatus !== 'available') {
+          this.showDownloadCompletePopup();
+        }
+        sessionStorage.setItem('lastAIStatus', 'available');
+        return true;
+      } else if (availability === 'downloadable') {
+        this.showDownloadProgress();
+        // Keep checking until available
+        setTimeout(() => this.checkAIAvailability(), 2000);
+        return false;
+      } else if (availability === 'unavailable') {
+        this.showError('Gemini Nano is not available. Please check your Chrome AI settings.');
         return false;
       }
       
-      return true;
+      return false;
     } catch (error) {
       console.error('Error checking AI availability:', error);
       this.showError('Error checking AI availability: ' + error.message);
       return false;
     }
+  }
+
+  showDownloadProgress() {
+    this.showLoading();
+    const loadingText = this.loadingIndicator.querySelector('.loading-text');
+    if (loadingText) {
+      loadingText.textContent = 'Downloading Gemini Nano model... Please wait.';
+    }
+  }
+
+  showDownloadCompletePopup() {
+    // Create a popup notification
+    const popup = document.createElement('div');
+    popup.className = 'download-complete-popup';
+    popup.innerHTML = `
+      <div class="popup-content">
+        <div class="popup-icon">✓</div>
+        <div class="popup-title">Gemini Nano Ready!</div>
+        <div class="popup-message">The AI model is now ready to use.</div>
+      </div>
+    `;
+    
+    document.body.appendChild(popup);
+    
+    // Remove popup after 3 seconds
+    setTimeout(() => {
+      popup.classList.add('fade-out');
+      setTimeout(() => popup.remove(), 500);
+    }, 3000);
   }
 
   switchMode(mode) {
@@ -129,30 +171,64 @@ class AIVisualizerPro {
       // Process with AI
       const result = await this.processWithAI(inputData);
       
-      // Add AI response to chat with page details
+      // Add AI response to chat with page details - only show if meaningful
       let responseText = result.summary;
       if (result.pageDetails) {
-        responseText += `\n\n📄 Page Details:\n`;
-        responseText += `Title: ${result.pageDetails.title}\n`;
-        responseText += `URL: ${result.pageDetails.url}\n`;
-        if (result.pageDetails.mainTopics && result.pageDetails.mainTopics.length > 0) {
-          responseText += `Main Topics: ${result.pageDetails.mainTopics.join(', ')}\n`;
-        }
-        if (result.pageDetails.keyInsights && result.pageDetails.keyInsights.length > 0) {
-          responseText += `Key Insights: ${result.pageDetails.keyInsights.join(', ')}`;
+        let hasContent = false;
+        
+        // Check if title is meaningful
+        const title = result.pageDetails.title && 
+                      result.pageDetails.title.trim() && 
+                      result.pageDetails.title !== 'Manual Input' && 
+                      result.pageDetails.title !== 'Unknown'
+                      ? result.pageDetails.title : null;
+        
+        // Check if URL is meaningful
+        const url = result.pageDetails.url && 
+                    result.pageDetails.url !== 'N/A' && 
+                    result.pageDetails.url.trim()
+                    ? result.pageDetails.url : null;
+        
+        // Check if main topics exist
+        const topics = result.pageDetails.mainTopics && 
+                       result.pageDetails.mainTopics.length > 0
+                       ? result.pageDetails.mainTopics : null;
+        
+        // Check if insights exist
+        const insights = result.pageDetails.keyInsights && 
+                         result.pageDetails.keyInsights.length > 0
+                         ? result.pageDetails.keyInsights : null;
+        
+        // Only add page details if there's meaningful content
+        if (title || url || topics || insights) {
+          responseText += `\n\n**Page Details:**\n`;
+          if (title) {
+            responseText += `Title: ${title}\n`;
+          }
+          if (url) {
+            responseText += `URL: ${url}\n`;
+          }
+          if (topics) {
+            responseText += `Main Topics: **${topics.join(', ')}**\n`;
+          }
+          if (insights) {
+            responseText += `Key Insights: **${insights.join(', ')}**`;
+          }
         }
       }
       
-      this.addMessageToChat('ai', responseText);
+      this.addMessageToChat('ai', responseText, true);
       
-      // Only show charts if AI determines they're necessary
-      if (result.showCharts && result.keywords && result.scores) {
+      // Only show charts if AI explicitly determines they're necessary AND we have data
+      if (result.showCharts && result.keywords && result.scores && 
+          result.keywords.length > 0 && result.scores.length > 0 && 
+          result.scores.every(s => typeof s === 'number')) {
         // Add chart reason to chat
-        this.addMessageToChat('ai', `📊 Charts: ${result.chartReason}`);
+        this.addMessageToChat('ai', `📊 Visualization: ${result.chartReason}`, true);
         await this.generateVisualizations(result.keywords, result.scores);
-      } else if (result.chartReason) {
-        // Explain why charts aren't shown
-        this.addMessageToChat('ai', `📊 Charts: ${result.chartReason}`);
+      } else {
+        // Hide charts if not needed
+        this.hideCharts();
       }
       
     } catch (error) {
@@ -176,7 +252,7 @@ class AIVisualizerPro {
           const data = {
             title: document.title,
             url: window.location.href,
-            text: document.body.innerText.slice(0, 8000), // Increased limit
+            text: document.body.innerText.slice(0, 12000), // Optimized limit for faster processing
             headings: Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'))
               .map(h => ({ tag: h.tagName, text: h.innerText.trim() }))
               .filter(h => h.text),
@@ -206,61 +282,65 @@ class AIVisualizerPro {
 
   async processWithAI(inputData) {
     try {
-      // Create AI session with enhanced system prompt
-    const session = await LanguageModel.create({
-        systemPrompt: `You are a professional AI assistant for Chrome Built-in AI Challenge 2025. Provide clear, concise responses. Only suggest charts when data analysis would benefit from visualization.`
+      const session = await LanguageModel.create({
+        systemPrompt: `Provide clear, helpful responses. Only suggest charts for numerical data.`,
+        output: 'en' // ensure output language is specified
       });
 
       let prompt = '';
       
       if (typeof inputData === 'object' && inputData.text) {
         // Screen capture mode - analyze webpage data
-        prompt = `Analyze this webpage and provide a professional summary:
+        prompt = `Analyze this webpage:
+Title: ${inputData.title}
+URL: ${inputData.url}
+Content: ${inputData.text.substring(0, 6000)}
 
-        Title: ${inputData.title}
-        URL: ${inputData.url}
-        Content: ${inputData.text.substring(0, 2000)}
-        Headings: ${inputData.headings.map(h => h.text).join(', ')}
-        
-        Provide a concise summary and determine if charts would be helpful for this content.
-        
-        Output format (JSON):
-        {
-          "summary": "Professional 2-3 sentence summary of this webpage...",
-          "showCharts": true/false,
-          "chartReason": "Why charts are/aren't needed",
-          "keywords": ["topic1", "topic2", "topic3", "topic4"],
-          "scores": [8, 7, 6, 5],
-          "pageDetails": {
-            "title": "${inputData.title}",
-            "url": "${inputData.url}",
-            "mainTopics": ["topic1", "topic2"],
-            "keyInsights": ["insight1", "insight2"]
-          }
-        }`;
+Requirements:
+- Provide a detailed summary with key information and takeaways
+- Only recommend charts if content has numerical data or statistics
+- Charts not needed for text-only content
+
+Output JSON only:
+{
+  "summary": "Detailed summary",
+  "showCharts": true/false,
+  "chartReason": "Brief reason",
+  "keywords": [],
+  "scores": [],
+  "pageDetails": {
+    "title": "${inputData.title}",
+    "url": "${inputData.url}",
+    "mainTopics": [],
+    "keyInsights": []
+  }
+}`;
       } else {
-        // Manual input mode - process user prompt
-        prompt = `Answer this question professionally: "${inputData}"
-        
-        Provide a helpful response and determine if charts would be useful.
-        
-      Output format (JSON):
-      {
-          "summary": "Professional response here...",
-          "showCharts": true/false,
-          "chartReason": "Why charts are/aren't needed",
-          "keywords": ["relevant", "topics"],
-          "scores": [7, 6],
-          "pageDetails": {
-            "title": "Manual Input",
-            "url": "N/A",
-            "mainTopics": ["user", "question"],
-            "keyInsights": ["response", "insights"]
-          }
-        }`;
+        // Manual input mode - process user prompt through Language Model
+        prompt = `Answer: "${inputData}"
+
+Requirements:
+- Provide a detailed response
+- Only recommend charts for numerical data
+
+Output JSON:
+{
+  "summary": "Detailed response",
+  "showCharts": true/false,
+  "chartReason": "Brief reason",
+  "keywords": [],
+  "scores": [],
+  "pageDetails": {
+    "title": "Manual Input",
+    "url": "N/A",
+    "mainTopics": [],
+    "keyInsights": []
+  }
+}`;
       }
 
-    const response = await session.prompt(prompt);
+      // Process through Prompt API
+      const response = await session.prompt(prompt);
       console.log('AI Response:', response);
       
       const parsed = this.parseJSON(response);
@@ -320,13 +400,19 @@ class AIVisualizerPro {
     }
   }
 
-  addMessageToChat(sender, content) {
+  addMessageToChat(sender, content, isHTML = false) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `chat-message message-${sender}`;
     
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
-    contentDiv.textContent = content;
+    
+    if (isHTML || sender === 'ai') {
+      // Parse and enhance content for AI messages
+      contentDiv.innerHTML = this.enhanceContent(content);
+    } else {
+      contentDiv.textContent = content;
+    }
     
     const timestampDiv = document.createElement('div');
     timestampDiv.className = 'message-timestamp';
@@ -349,6 +435,32 @@ class AIVisualizerPro {
     this.saveChatHistory();
   }
 
+  enhanceContent(content) {
+    // Make URLs clickable
+    let enhanced = content.replace(/https?:\/\/[^\s]+/g, (url) => {
+      return `<a href="${url}" target="_blank" class="chat-link">${url}</a>`;
+    });
+    
+    // Highlight key information patterns
+    enhanced = enhanced.replace(/\*\*(.*?)\*\*/g, '<strong class="highlight-text">$1</strong>');
+    enhanced = enhanced.replace(/Title:(.*?)(?=\n|$)/g, '<div class="info-label">📄 Title:</div><div class="info-value">$1</div>');
+    enhanced = enhanced.replace(/URL:(.*?)(?=\n|$)/g, '<div class="info-label">🔗 URL:</div><div class="info-value">$1</div>');
+    enhanced = enhanced.replace(/Main Topics:(.*?)(?=\n|$)/g, '<div class="info-label">📋 Main Topics:</div><div class="info-value">$1</div>');
+    enhanced = enhanced.replace(/Key Insights:(.*?)(?=\n|$)/g, '<div class="info-label">💡 Key Insights:</div><div class="info-value">$1</div>');
+    
+    // Add line breaks for better formatting
+    enhanced = enhanced.replace(/\n/g, '<br>');
+    
+    // Highlight important keywords
+    const importantKeywords = ['important', 'key', 'significant', 'critical', 'essential', 'notable'];
+    importantKeywords.forEach(keyword => {
+      const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+      enhanced = enhanced.replace(regex, `<span class="keyword-highlight">${keyword}</span>`);
+    });
+    
+    return enhanced;
+  }
+
 
   async generateVisualizations(keywords, scores) {
     try {
@@ -366,11 +478,16 @@ class AIVisualizerPro {
   }
 
   drawCharts(labels, values) {
+  // Only create one chart at a time based on what makes sense for the data
+  // Priority: Bar chart (best for comparisons), then pie (for distributions)
   const chartConfigs = [
     { id: "barChart", type: "bar" },
-    { id: "pieChart", type: "pie" },
-    { id: "lineChart", type: "line" }
+    { id: "pieChart", type: "pie" }
   ];
+
+  // Clear the line chart container to avoid confusion
+  const lineChartContainer = document.getElementById("lineChart").parentElement;
+  lineChartContainer.style.display = 'none';
 
   chartConfigs.forEach(({ id, type }) => {
     const ctx = document.getElementById(id).getContext("2d");
@@ -441,6 +558,11 @@ class AIVisualizerPro {
     this.charts = [];
   }
 
+  hideCharts() {
+    this.chartsContainer.style.display = 'none';
+    this.clearCharts();
+  }
+
   downloadAllCharts() {
     this.charts.forEach((chart, idx) => {
         const link = document.createElement("a");
@@ -474,17 +596,16 @@ class AIVisualizerPro {
     this.chatContainer.innerHTML = `
       <div class="welcome-message">
         <div class="welcome-content">
-          <h3>AI Visualizer Pro</h3>
-          <p>Professional AI-powered webpage analysis</p>
+          <h3>Content Analyzer</h3>
+          <p>Analyze webpages with AI</p>
           <ul>
-            <li><strong>Screen Capture:</strong> Analyze current webpage content</li>
-            <li><strong>Manual Input:</strong> Ask questions or request analysis</li>
+            <li><strong>Screen Capture:</strong> Analyze the current page</li>
+            <li><strong>Manual Input:</strong> Ask questions</li>
           </ul>
         </div>
       </div>
     `;
-    this.clearCharts();
-    this.chartsContainer.style.display = 'none';
+    this.hideCharts();
     this.saveChatHistory();
   }
 
@@ -525,7 +646,13 @@ class AIVisualizerPro {
       
       const contentDiv = document.createElement('div');
       contentDiv.className = 'message-content';
-      contentDiv.textContent = content;
+      
+      // Render AI messages with enhancement
+      if (sender === 'ai') {
+        contentDiv.innerHTML = this.enhanceContent(content);
+      } else {
+        contentDiv.textContent = content;
+      }
       
       const timestampDiv = document.createElement('div');
       timestampDiv.className = 'message-timestamp';
@@ -540,7 +667,7 @@ class AIVisualizerPro {
   }
 }
 
-// Initialize the application when DOM is loaded
+// Initialize extension
 document.addEventListener('DOMContentLoaded', () => {
-  new AIVisualizerPro();
+  new ContentAnalyzer();
 });

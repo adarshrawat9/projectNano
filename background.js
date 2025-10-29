@@ -68,7 +68,8 @@ async function handleProcessWithAI(data, sendResponse) {
     }
     
     const session = await LanguageModel.create({
-      systemPrompt: "You are an advanced AI assistant for the Chrome Built-in AI Challenge 2025. Provide helpful, accurate, and detailed responses."
+      systemPrompt: "You are an advanced AI assistant for the Chrome Built-in AI Challenge 2025. Provide helpful, accurate, and detailed responses.",
+      output: 'en' // ensure output language is specified
     });
     
     const response = await session.prompt(data.prompt);
@@ -116,7 +117,11 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 // Handle extension icon click
-chrome.action.onClicked.addListener((tab) => {
-  // This will open the popup automatically due to manifest configuration
-  console.log('Extension icon clicked for tab:', tab.url);
-});
+if (chrome.action && chrome.action.onClicked) {
+  chrome.action.onClicked.addListener((tab) => {
+    // This will open the popup automatically due to manifest configuration
+    console.log('Extension icon clicked for tab:', tab?.url);
+  });
+} else {
+  console.warn('chrome.action API not available in this environment');
+}
