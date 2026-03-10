@@ -1,22 +1,25 @@
 {
   "manifest_version": 3,
-  "name": "Content Analyzer",
+  "name": "Interacto",
   "version": "1.0",
   "description": "Analyze webpage content with Chrome's built-in AI.",
   "permissions": [
     "activeTab", 
     "scripting", 
     "storage",
-    "tabs"
+    "tabs",
+    "sidePanel"
   ],
+  "side_panel": {
+    "default_path": "popup.html"
+  },
+  "action": {
+    "default_title": "Click to open side panel"
+  },
   "host_permissions": [
     "<all_urls>"
   ],
-  "action": {
-    "default_popup": "popup.html",
-    "default_icon": "icon.png",
-    "default_title": "Content Analyzer"
-  },
+  
   "background": {
     "service_worker": "background.js"
   },
