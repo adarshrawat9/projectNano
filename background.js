@@ -125,3 +125,6 @@ if (chrome.action && chrome.action.onClicked) {
 } else {
   console.warn('chrome.action API not available in this environment');
 }
+chrome.sidePanel
+  .setPanelBehavior({ openPanelOnActionClick: true })
+  .catch((error) => console.error(error));
